@@ -1,0 +1,219 @@
+Build a mobile SaaS application called Just Trading.
+
+The app should be built using React Native with Expo so it works on both iOS and Android.
+
+The project must be structured as a clean, scalable MVP application with modular architecture.
+
+Use modern UI design with a dark trading-style interface.
+
+Primary colors:
+
+Background: deep black with a slight warm tone (#0F0F0F)
+Primary accent: dark orange (#FF7A1A)
+Secondary text: light gray (#B5B5B5)
+
+Use a minimalistic interface similar to professional trading tools.
+
+The app should include the following screens and functionality.
+
+App Overview
+
+Just Trading is a financial news aggregation app for traders.
+
+The app collects financial news from multiple sources and shows how markets react to news events.
+
+The goal is to help traders quickly understand:
+
+What happened in the market and how the price reacted.
+
+Core Features (MVP)
+1. News Feed Screen
+
+Create the main screen that displays a scrolling list of news articles.
+
+Each news card must include:
+
+• headline
+• short summary
+• source name
+• publication time
+• related asset symbol (example: AAPL, BTC, GOLD)
+• category (stocks, crypto, commodities, forex, macro)
+
+Each news item should also display:
+
+Market Sentiment Indicator:
+
+Green → Bullish
+Red → Bearish
+Gray → Neutral
+
+Display a small market reaction indicator:
+
+Example:
+
+BTC
++1.3% after news
+
+2. Market Reaction Data
+
+Each news item should show basic simulated market reaction data:
+
+Price before news
+Price after news
+Percentage change
+
+Example UI:
+
+Market Reaction
+
++0.4% (5 min)
++1.1% (30 min)
++1.6% (1h)
+
+This can initially use mock data but the structure must support real API data later.
+
+3. Asset Filtering
+
+Users can select which assets they want to follow.
+
+Examples:
+
+Tesla (TSLA)
+Apple (AAPL)
+Bitcoin (BTC)
+Ethereum (ETH)
+Gold (XAU)
+
+The feed should automatically prioritize news related to selected assets.
+
+4. Watchlist
+
+Users can create a watchlist of assets they want to track.
+
+Free plan:
+
+Maximum 2 assets
+
+Pro plan:
+
+Unlimited assets.
+
+5. Push Notifications
+
+Implement push notifications using Expo.
+
+Users receive notifications for:
+
+Breaking news
+News related to their watchlist assets
+
+Include settings to enable or disable notifications.
+
+6. Categories Screen
+
+Create a screen where users can browse news by category.
+
+Categories:
+
+Stocks
+Crypto
+Commodities
+Forex
+Macro
+
+7. AI Tags System
+
+Each news item should include automated tags such as:
+
+Bullish
+Bearish
+High Volatility
+Earnings
+Regulation
+Macro Event
+
+Display tags visually as small labels.
+
+8. Subscription System
+
+Implement a simple SaaS subscription model.
+
+Free Plan:
+
+• full news feed
+• 2 tracked assets
+• basic notifications
+
+Pro Plan ($10/month):
+
+• unlimited tracked assets
+• advanced filtering
+• priority alerts
+
+Use placeholder subscription logic for now.
+
+API Integration
+
+Structure the app so it can later connect to financial news APIs such as:
+
+Marketaux API
+Finnhub API
+NewsAPI
+CryptoPanic API
+
+For now implement mock API services with example data.
+
+UI Components
+
+Create reusable components:
+
+NewsCard
+MarketReactionIndicator
+AssetTag
+CategoryButton
+WatchlistItem
+
+Navigation
+
+Use React Navigation with the following tabs:
+
+Home (News Feed)
+Watchlist
+Categories
+Notifications
+Settings
+
+Settings Screen
+
+Include:
+
+Theme settings
+Notification settings
+Subscription upgrade option.
+
+Design Principles
+
+Minimalistic
+Fast loading
+Information-dense
+Optimized for traders
+
+Technical Requirements
+
+Use:
+
+React Native
+Expo
+React Navigation
+Modular folder structure
+Reusable components
+Clean state management
+
+Prepare the project so it can later integrate:
+
+Firebase
+Stripe subscriptions
+Real financial APIs.
+
+Generate a fully structured working MVP project.
