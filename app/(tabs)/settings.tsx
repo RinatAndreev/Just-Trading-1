@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Modal, Platform,
+  View, Text, StyleSheet, ScrollView, Pressable, Modal, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { CATEGORIES } from '@/constants/mockData';
@@ -38,7 +39,7 @@ function SettingRow({
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { subscription, upgradeToPro, downgradeToFree, activeCategories, toggleCategory } = useApp();
+  const { subscription, upgradeToPro, downgradeToFree, activeCategories, toggleCategory, user, logout } = useApp();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -51,6 +52,18 @@ export default function SettingsScreen() {
     }
   }
 
+  function handleSignOut() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    ]);
+  }
+
+  function getInitials(name: string) {
+    return name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+  }
+
   return (
     <ScrollView
       style={[styles.container, { paddingTop: topInset }]}
@@ -61,6 +74,42 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
         <Text style={styles.subtitle}>Preferences & account</Text>
       </View>
+
+      {user ? (
+        <View style={styles.accountCard}>
+          <View style={styles.accountLeft}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
+            </View>
+            <View style={styles.accountInfo}>
+              <Text style={styles.accountName}>{user.name}</Text>
+              <Text style={styles.accountEmail}>{user.email}</Text>
+            </View>
+          </View>
+          <Pressable
+            onPress={handleSignOut}
+            style={({ pressed }) => [styles.signOutBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Ionicons name="log-out-outline" size={16} color={Colors.bearish} />
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          onPress={() => router.push('/(auth)/login')}
+          style={({ pressed }) => [styles.signInCard, pressed && { opacity: 0.85 }]}
+        >
+          <View style={styles.signInLeft}>
+            <View style={styles.signInIconBg}>
+              <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
+            </View>
+            <View>
+              <Text style={styles.signInTitle}>Sign in or Create Account</Text>
+              <Text style={styles.signInSubtitle}>Save preferences & sync across devices</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </Pressable>
+      )}
 
       <View style={[styles.planCard, subscription === 'pro' && styles.planCardPro]}>
         <View style={styles.planLeft}>
@@ -202,6 +251,38 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   title: { fontSize: 22, fontFamily: 'Inter_700Bold', color: Colors.textPrimary, letterSpacing: -0.5 },
   subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textMuted, marginTop: 2 },
+  accountCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: 16, marginBottom: 16,
+    backgroundColor: Colors.card, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  accountLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  avatarCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.accentDim, borderWidth: 1, borderColor: Colors.accentDimBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: Colors.accent },
+  accountInfo: { flex: 1, gap: 2 },
+  accountName: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: Colors.textPrimary },
+  accountEmail: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  signOutBtn: { padding: 8 },
+  signInCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: 16, marginBottom: 16,
+    backgroundColor: Colors.card, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  signInLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  signInIconBg: {
+    width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.backgroundTertiary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  signInTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: Colors.textPrimary, marginBottom: 2 },
+  signInSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
   planCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginHorizontal: 16, marginBottom: 24,
