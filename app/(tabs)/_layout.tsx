@@ -19,12 +19,12 @@ function NativeTabLayout() {
         <Label>Watchlist</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="categories">
-        <Icon sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }} />
+        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
         <Label>Markets</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="alerts">
-        <Icon sf={{ default: "bell", selected: "bell.fill" }} />
-        <Label>Alerts</Label>
+      <NativeTabs.Trigger name="portfolio">
+        <Icon sf={{ default: "briefcase", selected: "briefcase.fill" }} />
+        <Label>Portfolio</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
@@ -87,16 +87,16 @@ function ClassicTabLayout() {
         options={{
           title: "Markets",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="alerts"
+        name="portfolio"
         options={{
-          title: "Alerts",
+          title: "Portfolio",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
+            <Ionicons name="briefcase-outline" size={size} color={color} />
           ),
         }}
       />
@@ -109,6 +109,7 @@ function ClassicTabLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="alerts" options={{ href: null }} />
     </Tabs>
   );
 }

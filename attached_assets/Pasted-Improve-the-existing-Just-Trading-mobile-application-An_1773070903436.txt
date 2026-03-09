@@ -1,0 +1,298 @@
+Improve the existing Just Trading mobile application.
+
+Analyze the current project structure and features first.
+If some features already exist, improve them.
+If they do not exist yet, implement them.
+
+Do NOT break the existing architecture.
+Extend the application cleanly using modular components.
+
+The app is built with React Native and Expo.
+
+1. Real Financial News Integration
+
+If the app currently uses mock or fake news data, replace it with real financial news APIs.
+
+Add support for at least one financial news source such as:
+
+Finnhub API
+
+Marketaux API
+
+CryptoPanic API
+
+NewsAPI
+
+Create a clean API service layer.
+
+Example structure:
+
+services/
+newsService.ts
+marketService.ts
+
+Fetch real news articles including:
+
+headline
+summary
+source
+timestamp
+related assets
+
+Cache requests to prevent excessive API calls.
+
+2. Asset Price Data Integration
+
+Integrate real market price data using APIs such as:
+
+Finnhub
+
+Alpha Vantage
+
+Twelve Data
+
+Display:
+
+current price
+daily % change
+volume (if available)
+
+Attach this data to assets mentioned in news.
+
+3. Chart Screen
+
+Add a new screen called Charts.
+
+Users should be able to:
+
+Search for any asset or symbol such as:
+
+AAPL
+TSLA
+BTC
+ETH
+SPY
+NASDAQ
+GOLD
+
+Display an interactive price chart.
+
+Use a chart library compatible with React Native such as:
+
+react-native-chart-kit
+victory-native
+lightweight-charts wrapper
+
+Allow timeframes:
+
+1D
+1W
+1M
+3M
+1Y
+
+Charts should load price history from a market data API.
+
+4. Open Chart From News
+
+If a news item references an asset (example: AAPL or BTC), allow users to tap the asset symbol.
+
+This should open the Chart screen for that asset.
+
+Example flow:
+
+News Card → Tap Asset → Chart Screen.
+
+5. Portfolio Tracker
+
+Add a new screen called Portfolio.
+
+Users should be able to add assets to their portfolio.
+
+Each entry should include:
+
+asset symbol
+quantity OR position value
+
+Example:
+
+TSLA
+10 shares
+
+or
+
+BTC
+$2000 position
+
+The app should calculate:
+
+total portfolio value
+daily P/L
+percentage change
+
+Use live market data for updates.
+
+Display a simple portfolio summary:
+
+Total value
+Daily change
+Top performing asset
+Worst performing asset.
+
+6. Impact Score for News
+
+Implement a new feature called Impact Score.
+
+Each news item should display a score from 1 to 10 indicating potential market impact.
+
+Example:
+
+Impact Score: 8/10
+
+If real analysis is not available yet, simulate this with simple heuristics based on keywords such as:
+
+earnings
+ETF
+regulation
+lawsuit
+rate decision.
+
+Display the score visually on the news card.
+
+7. Market Reaction Timeline
+
+Enhance each news item with a Market Reaction section.
+
+Display simulated or real data:
+
+Price before news
+Price after 5 minutes
+Price after 30 minutes
+Price after 1 hour
+
+Example UI:
+
+Market Reaction
+
++0.3% (5m)
++1.2% (30m)
++1.8% (1h)
+
+Use placeholder data if necessary but structure the code for real API integration later.
+
+8. Most Market Moving News
+
+Add a new section on the Home screen:
+
+"Most Market Moving News Today"
+
+This section should rank news by:
+
+highest price impact
+largest market movement.
+
+Display the top 5 stories of the day.
+
+9. Shareable News Cards
+
+Allow users to share a news card.
+
+Add a Share button.
+
+The shared message should include:
+
+headline
+asset
+price impact
+app name
+
+Example:
+
+"This news moved BTC +4.2%
+via Just Trading"
+
+Use native share functionality.
+
+10. Push Notifications Improvements
+
+Improve the notification system.
+
+Users should be able to enable notifications for:
+
+specific assets
+breaking news
+macro events
+
+Use Expo push notifications.
+
+11. Watchlist Improvements
+
+Allow users to add assets to a Watchlist.
+
+Display for each asset:
+
+current price
+daily change
+mini chart
+
+12. Market Overview Screen
+
+Add a new screen called Market Overview.
+
+Display major indices:
+
+S&P 500
+NASDAQ
+Dow Jones
+Bitcoin
+Ethereum
+Gold
+Oil
+
+Show:
+
+current price
+daily change
+mini charts.
+
+13. Performance Optimization
+
+Improve app performance.
+
+Implement:
+
+lazy loading
+API caching
+optimized rendering for long news feeds.
+
+14. UI Improvements
+
+Improve the visual design.
+
+Maintain the existing dark theme:
+
+background #0F0F0F
+primary accent #FF7A1A
+
+Enhance:
+
+news cards
+portfolio cards
+charts
+watchlist UI.
+
+Make the interface look like a professional trading tool.
+
+15. Code Structure Improvements
+
+Ensure the project has clean architecture:
+
+components/
+screens/
+services/
+hooks/
+utils/
+
+Avoid duplicated logic.
+
+Generate all missing functionality and update the app accordingly.

@@ -1,33 +1,31 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Share } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { NewsItem } from '@/constants/types';
 import { Colors } from '@/constants/colors';
 import { SentimentBadge } from './SentimentBadge';
 import { AITagsList } from './AITagsList';
 import { MarketReactionIndicator } from './MarketReactionIndicator';
 import { AssetTag } from './AssetTag';
+import { ImpactScore } from './ImpactScore';
+import { calculateImpactScore } from '@/utils/impactScore';
+import { timeAgo } from '@/utils/formatters';
 
 interface Props {
   item: NewsItem;
   onPress?: (item: NewsItem) => void;
+  compact?: boolean;
 }
 
-function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-export function NewsCard({ item, onPress }: Props) {
+export function NewsCard({ item, onPress, compact = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const scale = useSharedValue(1);
+  const router = useRouter();
 
+  const impactScore = calculateImpactScore(item);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   function handlePress() {
@@ -39,9 +37,54 @@ export function NewsCard({ item, onPress }: Props) {
     onPress?.(item);
   }
 
+  function handleAssetPress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/chart/${item.assetSymbol}`);
+  }
+
+  async function handleShare() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const change = item.marketReaction.change1h;
+    const sign = change > 0 ? '+' : '';
+    try {
+      await Share.share({
+        message: `${item.headline}\n\n${item.assetSymbol} moved ${sign}${change.toFixed(1)}% on this news.\n\nvia Just Trading`,
+        title: item.headline,
+      });
+    } catch {}
+  }
+
   const primaryChange = item.marketReaction.change30m;
   const changeColor = primaryChange > 0 ? Colors.bullish : primaryChange < 0 ? Colors.bearish : Colors.neutral;
   const changeSign = primaryChange > 0 ? '+' : '';
+
+  if (compact) {
+    return (
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [styles.compactCard, pressed && { opacity: 0.8 }]}
+      >
+        {item.isBreaking && (
+          <View style={styles.breakingBannerCompact}>
+            <Text style={styles.breakingTextCompact}>BREAKING</Text>
+          </View>
+        )}
+        <View style={styles.compactSymbolRow}>
+          <Pressable onPress={handleAssetPress} style={styles.assetPill}>
+            <Text style={styles.assetPillText}>{item.assetSymbol}</Text>
+          </Pressable>
+          <Text style={[styles.compactChange, { color: changeColor }]}>
+            {changeSign}{primaryChange.toFixed(1)}%
+          </Text>
+        </View>
+        <Text style={styles.compactHeadline} numberOfLines={2}>{item.headline}</Text>
+        <View style={styles.compactMeta}>
+          <Text style={styles.compactSource}>{item.source}</Text>
+          <ImpactScore score={impactScore} compact />
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
     <Animated.View style={animStyle}>
@@ -55,12 +98,17 @@ export function NewsCard({ item, onPress }: Props) {
 
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <AssetTag symbol={item.assetSymbol} size="sm" />
+            <Pressable onPress={handleAssetPress} hitSlop={8} testID={`chart-${item.assetSymbol}`}>
+              <AssetTag symbol={item.assetSymbol} size="sm" />
+            </Pressable>
             <Text style={styles.source}>{item.source}</Text>
             <Text style={styles.time}>{timeAgo(item.publishedAt)}</Text>
           </View>
           <View style={styles.headerRight}>
             <SentimentBadge sentiment={item.sentiment} size="sm" />
+            <Pressable onPress={handleShare} hitSlop={8} style={styles.shareBtn} testID={`share-${item.id}`}>
+              <Ionicons name="share-outline" size={16} color={Colors.textMuted} />
+            </Pressable>
           </View>
         </View>
 
@@ -86,6 +134,7 @@ export function NewsCard({ item, onPress }: Props) {
 
         <View style={styles.footer}>
           <AITagsList tags={item.tags} />
+          <ImpactScore score={impactScore} compact />
         </View>
       </Pressable>
     </Animated.View>
@@ -132,7 +181,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerRight: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shareBtn: {
+    padding: 2,
   },
   source: {
     fontSize: 11,
@@ -183,5 +237,53 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  compactCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: 12,
+    gap: 8,
+    width: 220,
+    overflow: 'hidden',
+  },
+  breakingBannerCompact: {
+    position: 'absolute',
+    top: 0, right: 0,
+    backgroundColor: Colors.accentDim,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderBottomLeftRadius: 6,
+  },
+  breakingTextCompact: {
+    fontSize: 8, fontFamily: 'Inter_700Bold',
+    color: Colors.accent, letterSpacing: 0.8,
+  },
+  compactSymbolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  assetPill: {
+    backgroundColor: Colors.accentDim,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1, borderColor: Colors.accentDimBorder,
+  },
+  assetPillText: {
+    fontSize: 11, fontFamily: 'Inter_700Bold', color: Colors.accent,
+  },
+  compactChange: {
+    fontSize: 14, fontFamily: 'Inter_700Bold', letterSpacing: -0.3,
+  },
+  compactHeadline: {
+    fontSize: 13, fontFamily: 'Inter_600SemiBold',
+    color: Colors.textPrimary, lineHeight: 18, letterSpacing: -0.1,
+  },
+  compactMeta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  compactSource: {
+    fontSize: 10, fontFamily: 'Inter_400Regular', color: Colors.textMuted,
   },
 });

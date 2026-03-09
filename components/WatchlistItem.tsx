@@ -3,8 +3,11 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { Asset } from '@/constants/types';
 import { Colors } from '@/constants/colors';
+import { MiniChart } from './MiniChart';
+import { formatPrice } from '@/utils/formatters';
 
 interface Props {
   asset: Asset;
@@ -15,6 +18,7 @@ export function WatchlistItem({ asset, onRemove }: Props) {
   const isPositive = asset.changePercent24h >= 0;
   const changeColor = asset.changePercent24h === 0 ? Colors.neutral : isPositive ? Colors.bullish : Colors.bearish;
   const changeSign = asset.changePercent24h > 0 ? '+' : '';
+  const router = useRouter();
 
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -27,23 +31,31 @@ export function WatchlistItem({ asset, onRemove }: Props) {
     onRemove?.();
   }
 
-  function formatPrice(price: number, currency: string) {
-    if (!currency) return price.toFixed(4);
-    if (price > 10000) return `${currency}${price.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-    if (price > 100) return `${currency}${price.toFixed(2)}`;
-    return `${currency}${price.toFixed(2)}`;
+  function handlePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/chart/${asset.symbol}`);
   }
 
   return (
     <Animated.View style={animStyle}>
-      <View style={styles.container}>
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [styles.container, pressed && { opacity: 0.85 }]}
+        testID={`watchlist-${asset.symbol}`}
+      >
         <View style={styles.symbolContainer}>
           <Text style={styles.symbol}>{asset.symbol}</Text>
           <Text style={styles.name} numberOfLines={1}>{asset.name}</Text>
         </View>
 
         <View style={styles.sparklineArea}>
-          <MiniSparkline positive={isPositive} />
+          <MiniChart
+            symbol={asset.symbol}
+            currentPrice={asset.price}
+            changePercent={asset.changePercent24h}
+            width={72}
+            height={28}
+          />
         </View>
 
         <View style={styles.priceContainer}>
@@ -61,36 +73,12 @@ export function WatchlistItem({ asset, onRemove }: Props) {
         </View>
 
         {onRemove && (
-          <Pressable onPress={handleRemove} style={styles.removeBtn}>
+          <Pressable onPress={handleRemove} style={styles.removeBtn} hitSlop={8}>
             <Ionicons name="close" size={16} color={Colors.textMuted} />
           </Pressable>
         )}
-      </View>
+      </Pressable>
     </Animated.View>
-  );
-}
-
-function MiniSparkline({ positive }: { positive: boolean }) {
-  const color = positive ? Colors.bullish : Colors.bearish;
-  const bars = positive
-    ? [8, 12, 10, 16, 14, 18, 20]
-    : [20, 16, 18, 12, 14, 10, 8];
-  return (
-    <View style={styles.sparkline}>
-      {bars.map((h, i) => (
-        <View
-          key={i}
-          style={{
-            width: 4,
-            height: h,
-            backgroundColor: color,
-            borderRadius: 2,
-            opacity: 0.6 + (i / bars.length) * 0.4,
-            alignSelf: 'flex-end',
-          }}
-        />
-      ))}
-    </View>
   );
 }
 
@@ -123,13 +111,6 @@ const styles = StyleSheet.create({
   sparklineArea: {
     flex: 1,
     alignItems: 'center',
-  },
-  sparkline: {
-    width: 48,
-    height: 20,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
   },
   priceContainer: {
     alignItems: 'flex-end',
