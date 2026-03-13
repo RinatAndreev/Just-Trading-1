@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
+import { normalizeFinnhubItems, type FinnhubNewsItem } from "./newsNormalizer";
 
 const MAJOR_ASSETS = [
   { symbol: 'SPY', name: 'S&P 500 ETF', price: 524.80, changePercent: 0.42, currency: '$', category: 'stocks' },
@@ -167,8 +168,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(history);
   });
 
-  app.get('/api/news', (_req, res) => {
-    res.status(204).end();
+  const NEWS_CACHE_TTL = 5 * 60 * 1000;
+  let newsCache: { data: unknown[]; ts: number } | null = null;
+
+  app.get('/api/news', async (_req, res) => {
+    const apiKey = process.env.FINNHUB_API_KEY;
+    if (!apiKey) {
+      return res.status(204).end();
+    }
+
+    const now = Date.now();
+    if (newsCache && now - newsCache.ts < NEWS_CACHE_TTL) {
+      return res.json(newsCache.data);
+    }
+
+    try {
+      const [generalRes, cryptoRes] = await Promise.all([
+        fetch(`https://finnhub.io/api/v1/news?category=general&token=${apiKey}`, {
+          signal: AbortSignal.timeout(6000),
+        }),
+        fetch(`https://finnhub.io/api/v1/news?category=crypto&token=${apiKey}`, {
+          signal: AbortSignal.timeout(6000),
+        }),
+      ]);
+
+      const results: FinnhubNewsItem[] = [];
+
+      if (generalRes.ok) {
+        const generalItems = (await generalRes.json()) as FinnhubNewsItem[];
+        results.push(...generalItems);
+      }
+      if (cryptoRes.ok) {
+        const cryptoItems = (await cryptoRes.json()) as FinnhubNewsItem[];
+        results.push(...cryptoItems);
+      }
+
+      if (results.length === 0) {
+        return res.status(204).end();
+      }
+
+      results.sort((a, b) => b.datetime - a.datetime);
+
+      const normalized = normalizeFinnhubItems(results).slice(0, 40);
+      newsCache = { data: normalized, ts: now };
+
+      console.log(`[Finnhub] Fetched ${normalized.length} news items (${results.length} raw)`);
+      return res.json(normalized);
+    } catch (err) {
+      console.warn('[Finnhub] news fetch failed:', (err as Error).message);
+      return res.status(204).end();
+    }
   });
 
   const httpServer = createServer(app);
