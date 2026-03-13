@@ -5,15 +5,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { MOCK_NEWS, CATEGORIES } from '@/constants/mockData';
 import { NewsItem, Category } from '@/constants/types';
 import { NewsCard } from '@/components/NewsCard';
 import { useApp } from '@/context/AppContext';
+import { getTopMovers } from '@/services/newsService';
 
 const ALL_KEY = 'all';
+
+function TopMoverCard({ item }: { item: NewsItem }) {
+  return <NewsCard item={item} compact />;
+}
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -24,6 +28,7 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const watchlistSymbols = new Set(watchlist.map(w => w.symbol));
+  const topMovers = getTopMovers(MOCK_NEWS, 5);
 
   const filteredNews = MOCK_NEWS.filter(item => {
     if (selectedCategory !== ALL_KEY && item.category !== selectedCategory) return false;
@@ -59,6 +64,49 @@ export default function FeedScreen() {
   }
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
+
+  const ListHeader = () => (
+    <>
+      {selectedCategory === ALL_KEY && !searchQuery && (
+        <View style={styles.topMoversSection}>
+          <View style={styles.topMoversHeader}>
+            <View style={styles.topMoversTitleRow}>
+              <View style={styles.fireIcon}>
+                <Ionicons name="flame" size={14} color={Colors.accent} />
+              </View>
+              <Text style={styles.topMoversTitle}>Most Market Moving Today</Text>
+            </View>
+            <Text style={styles.topMoversSubtitle}>Ranked by price impact</Text>
+          </View>
+          <FlatList
+            horizontal
+            data={topMovers}
+            keyExtractor={item => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.topMoversList}
+            ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+            renderItem={({ item, index }) => (
+              <View>
+                <View style={styles.rankBadge}>
+                  <Text style={styles.rankText}>#{index + 1}</Text>
+                </View>
+                <TopMoverCard item={item} />
+              </View>
+            )}
+          />
+        </View>
+      )}
+
+      {filteredNews.length > 0 && (
+        <View style={styles.feedHeaderRow}>
+          <Text style={styles.feedSectionLabel}>
+            {selectedCategory === ALL_KEY ? 'Latest News' : `${CATEGORIES.find(c => c.key === selectedCategory)?.label} News`}
+          </Text>
+          <Text style={styles.feedCount}>{filteredNews.length} articles</Text>
+        </View>
+      )}
+    </>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
@@ -120,7 +168,7 @@ export default function FeedScreen() {
           { paddingBottom: Platform.OS === 'web' ? 34 + 84 : insets.bottom + 20 },
         ]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!filteredNews.length}
+        scrollEnabled={!!filteredNews.length || true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -128,6 +176,7 @@ export default function FeedScreen() {
             tintColor={Colors.accent}
           />
         }
+        ListHeaderComponent={<ListHeader />}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
@@ -224,9 +273,83 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontFamily: 'Inter_600SemiBold',
   },
+  topMoversSection: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  topMoversHeader: {
+    paddingHorizontal: 0,
+    gap: 4,
+  },
+  topMoversTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fireIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: Colors.accentDim,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.accentDimBorder,
+  },
+  topMoversTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+  },
+  topMoversSubtitle: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textMuted,
+    paddingLeft: 34,
+  },
+  topMoversList: {
+    paddingRight: 4,
+  },
+  rankBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 10,
+    backgroundColor: Colors.backgroundTertiary,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  rankText: {
+    fontSize: 9,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.textMuted,
+  },
+  feedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  feedSectionLabel: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  feedCount: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textMuted,
+  },
   list: {
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   emptyState: {
     alignItems: 'center',
