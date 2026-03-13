@@ -14,6 +14,12 @@ export interface MarketOverviewItem {
   category: string;
 }
 
+export interface CryptoPrice {
+  symbol: string;
+  price: number;
+  changePercent24h: number;
+}
+
 const OVERVIEW_FALLBACK: MarketOverviewItem[] = [
   { symbol: 'SPY', name: 'S&P 500', price: 524.80, changePercent: 0.42, currency: '$', category: 'stocks' },
   { symbol: 'QQQ', name: 'NASDAQ 100', price: 447.20, changePercent: 0.85, currency: '$', category: 'stocks' },
@@ -30,7 +36,7 @@ export function useMarketOverview() {
     queryFn: async () => {
       try {
         const url = new URL('/api/market/overview', getApiUrl());
-        const res = await fetch(url.toString(), { signal: AbortSignal.timeout(4000) });
+        const res = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) return data;
@@ -39,6 +45,27 @@ export function useMarketOverview() {
       return OVERVIEW_FALLBACK;
     },
     staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCryptoPrices() {
+  return useQuery<CryptoPrice[]>({
+    queryKey: ['/api/market/crypto-prices'],
+    queryFn: async () => {
+      try {
+        const url = new URL('/api/market/crypto-prices', getApiUrl());
+        const res = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) return data;
+        }
+      } catch {}
+      return [];
+    },
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
     gcTime: 5 * 60 * 1000,
   });
 }

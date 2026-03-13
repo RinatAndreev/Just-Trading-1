@@ -11,6 +11,54 @@ const MAJOR_ASSETS = [
   { symbol: 'OIL', name: 'Crude Oil', price: 79.60, changePercent: -3.40, currency: '$', category: 'commodities' },
 ];
 
+const COINGECKO_IDS: Record<string, string> = {
+  bitcoin: 'BTC',
+  ethereum: 'ETH',
+  solana: 'SOL',
+};
+
+interface LiveCryptoData {
+  price: number;
+  changePercent24h: number;
+}
+
+let cryptoCache: { data: Record<string, LiveCryptoData>; ts: number } | null = null;
+const CRYPTO_CACHE_TTL = 60 * 1000;
+
+async function fetchCoinGeckoPrices(): Promise<Record<string, LiveCryptoData>> {
+  const now = Date.now();
+  if (cryptoCache && now - cryptoCache.ts < CRYPTO_CACHE_TTL) {
+    return cryptoCache.data;
+  }
+
+  try {
+    const ids = Object.keys(COINGECKO_IDS).join(',');
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+
+    if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+
+    const raw = (await res.json()) as Record<string, { usd: number; usd_24h_change?: number }>;
+
+    const mapped: Record<string, LiveCryptoData> = {};
+    for (const [geckoId, symbol] of Object.entries(COINGECKO_IDS)) {
+      if (raw[geckoId]) {
+        mapped[symbol] = {
+          price: raw[geckoId].usd,
+          changePercent24h: parseFloat((raw[geckoId].usd_24h_change ?? 0).toFixed(2)),
+        };
+      }
+    }
+
+    cryptoCache = { data: mapped, ts: now };
+    console.log(`[CoinGecko] Fetched live prices: BTC=$${mapped['BTC']?.price ?? '?'}, ETH=$${mapped['ETH']?.price ?? '?'}, SOL=$${mapped['SOL']?.price ?? '?'}`);
+    return mapped;
+  } catch (err) {
+    console.warn('[CoinGecko] fetch failed, using cached/fallback data:', (err as Error).message);
+    return cryptoCache?.data ?? {};
+  }
+}
+
 function seededRandom(seed: number): number {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
@@ -50,43 +98,72 @@ function generateHistory(symbol: string, currentPrice: number, changePercent: nu
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.get('/api/market/overview', (_req, res) => {
-    res.json(MAJOR_ASSETS);
+  app.get('/api/market/crypto-prices', async (_req, res) => {
+    const prices = await fetchCoinGeckoPrices();
+    const result = Object.entries(prices).map(([symbol, d]) => ({
+      symbol,
+      price: d.price,
+      changePercent24h: d.changePercent24h,
+    }));
+    res.json(result);
   });
 
-  app.get('/api/market/quotes', (req, res) => {
+  app.get('/api/market/overview', async (_req, res) => {
+    const live = await fetchCoinGeckoPrices();
+
+    const assets = MAJOR_ASSETS.map(a => {
+      const liveData = live[a.symbol];
+      if (liveData) {
+        return { ...a, price: liveData.price, changePercent: liveData.changePercent24h };
+      }
+      return a;
+    });
+
+    res.json(assets);
+  });
+
+  app.get('/api/market/quotes', async (req, res) => {
     const symbolsParam = req.query.symbols as string;
     if (!symbolsParam) {
       return res.status(400).json({ error: 'symbols parameter required' });
     }
+
+    const live = await fetchCoinGeckoPrices();
     const requested = symbolsParam.split(',').map(s => s.trim().toUpperCase());
+
     const quotes = MAJOR_ASSETS
       .filter(a => requested.includes(a.symbol))
-      .map(a => ({
-        symbol: a.symbol,
-        price: a.price,
-        changePercent24h: a.changePercent,
-        currency: a.currency,
-      }));
+      .map(a => {
+        const liveData = live[a.symbol];
+        return {
+          symbol: a.symbol,
+          price: liveData ? liveData.price : a.price,
+          changePercent24h: liveData ? liveData.changePercent24h : a.changePercent,
+          currency: a.currency,
+        };
+      });
+
     res.json(quotes);
   });
 
-  app.get('/api/market/history', (req, res) => {
+  app.get('/api/market/history', async (req, res) => {
     const symbol = (req.query.symbol as string)?.toUpperCase();
     const timeframe = (req.query.timeframe as string) || '1M';
 
-    const asset = MAJOR_ASSETS.find(a => a.symbol === symbol) || {
+    const live = await fetchCoinGeckoPrices();
+
+    const baseAsset = MAJOR_ASSETS.find(a => a.symbol === symbol) || {
       symbol: symbol || 'UNKNOWN',
       price: 100,
       changePercent: 0,
     };
 
-    const history = generateHistory(
-      asset.symbol,
-      asset.price,
-      asset.changePercent,
-      timeframe
-    );
+    const liveData = live[symbol];
+    const asset = liveData
+      ? { ...baseAsset, price: liveData.price, changePercent: liveData.changePercent24h }
+      : baseAsset;
+
+    const history = generateHistory(asset.symbol, asset.price, asset.changePercent, timeframe);
     res.json(history);
   });
 
