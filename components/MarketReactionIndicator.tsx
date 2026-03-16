@@ -6,6 +6,7 @@ import { Colors } from '@/constants/colors';
 interface Props {
   reaction: MarketReaction;
   compact?: boolean;
+  columns?: 2 | 3;
 }
 
 function ReactionCell({ label, value, currency }: { label: string; value: number; currency: string }) {
@@ -20,14 +21,18 @@ function ReactionCell({ label, value, currency }: { label: string; value: number
   );
 }
 
-export function MarketReactionIndicator({ reaction, compact = false }: Props) {
+export function MarketReactionIndicator({ reaction, compact = false, columns = 3 }: Props) {
   return (
     <View style={[styles.container, compact && styles.compact]}>
       <ReactionCell label="5m" value={reaction.change5m} currency={reaction.currency} />
       <View style={styles.divider} />
       <ReactionCell label="30m" value={reaction.change30m} currency={reaction.currency} />
-      <View style={styles.divider} />
-      <ReactionCell label="1h" value={reaction.change1h} currency={reaction.currency} />
+      {columns === 3 && (
+        <>
+          <View style={styles.divider} />
+          <ReactionCell label="1h" value={reaction.change1h} currency={reaction.currency} />
+        </>
+      )}
     </View>
   );
 }

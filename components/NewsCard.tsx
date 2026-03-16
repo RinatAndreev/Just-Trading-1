@@ -54,7 +54,7 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
     } catch {}
   }
 
-  const primaryChange = item.marketReaction.change30m;
+  const primaryChange = item.marketReaction.change1h;
   const changeColor = primaryChange > 0 ? Colors.bullish : primaryChange < 0 ? Colors.bearish : Colors.neutral;
   const changeSign = primaryChange > 0 ? '+' : '';
 
@@ -125,10 +125,10 @@ export function NewsCard({ item, onPress, compact = false }: Props) {
             <Text style={[styles.reactionChange, { color: changeColor }]}>
               {changeSign}{primaryChange.toFixed(1)}%
             </Text>
-            <Text style={styles.reactionLabel}>30m reaction</Text>
+            <Text style={styles.reactionLabel}>1h reaction</Text>
           </View>
           <View style={styles.reactionDetail}>
-            <MarketReactionIndicator reaction={item.marketReaction} compact />
+            <MarketReactionIndicator reaction={item.marketReaction} compact columns={2} />
           </View>
         </View>
 

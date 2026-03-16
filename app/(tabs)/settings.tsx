@@ -10,6 +10,7 @@ import { Colors } from '@/constants/colors';
 import { CATEGORIES } from '@/constants/mockData';
 import { Category } from '@/constants/types';
 import { useApp } from '@/context/AppContext';
+import { useAlarms } from '@/context/AlarmsContext';
 
 function SettingRow({
   icon, label, value, onPress, danger = false,
@@ -40,6 +41,7 @@ function SettingRow({
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { subscription, upgradeToPro, downgradeToFree, activeCategories, toggleCategory, user, logout } = useApp();
+  const { alarms, removeAlarm, toggleAlarm } = useAlarms();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -170,6 +172,58 @@ export default function SettingsScreen() {
             })}
           </View>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>PRICE ALARMS</Text>
+        {alarms.length === 0 ? (
+          <View style={styles.alarmsEmpty}>
+            <Ionicons name="notifications-off-outline" size={24} color={Colors.textMuted} />
+            <Text style={styles.alarmsEmptyText}>No price alarms set. Open a chart to add one.</Text>
+          </View>
+        ) : (
+          <View style={styles.card}>
+            {alarms.map((alarm, idx) => {
+              const color = alarm.triggeredAt ? Colors.neutral : alarm.isActive ? Colors.accent : Colors.textMuted;
+              return (
+                <View key={alarm.id}>
+                  {idx > 0 && <View style={styles.rowDivider} />}
+                  <View style={styles.alarmRow}>
+                    <View style={styles.alarmLeft}>
+                      <Ionicons
+                        name={alarm.condition === 'above' ? 'arrow-up-circle' : 'arrow-down-circle'}
+                        size={18} color={color}
+                      />
+                      <View>
+                        <Text style={styles.alarmSymbol}>{alarm.symbol}</Text>
+                        <Text style={[styles.alarmCondition, { color }]}>
+                          {alarm.condition === 'above' ? 'Above' : 'Below'} {alarm.currency}{alarm.targetPrice}
+                          {alarm.triggeredAt ? '  · Triggered' : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.alarmActions}>
+                      {!alarm.triggeredAt && (
+                        <Pressable
+                          onPress={() => { toggleAlarm(alarm.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                          hitSlop={8}
+                        >
+                          <View style={[styles.alarmDot, { backgroundColor: alarm.isActive ? Colors.bullish : Colors.textMuted }]} />
+                        </Pressable>
+                      )}
+                      <Pressable
+                        onPress={() => { removeAlarm(alarm.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={Colors.bearish} />
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -361,4 +415,19 @@ const styles = StyleSheet.create({
   upgradeBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: Colors.black },
   cancelBtn: { paddingVertical: 10 },
   cancelBtnText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  alarmsEmpty: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.cardBorder,
+    padding: 16,
+  },
+  alarmsEmptyText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  alarmRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, paddingHorizontal: 4,
+  },
+  alarmLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  alarmSymbol: { fontSize: 14, fontFamily: 'Inter_700Bold', color: Colors.textPrimary },
+  alarmCondition: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  alarmActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  alarmDot: { width: 12, height: 12, borderRadius: 6 },
 });

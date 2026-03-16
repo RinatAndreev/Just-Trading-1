@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
-  Modal, TextInput, Platform, Share, Alert,
+  Modal, TextInput, Platform, Alert,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,10 +12,10 @@ import { Colors } from '@/constants/colors';
 import { MOCK_ASSETS } from '@/constants/mockData';
 import { Asset } from '@/constants/types';
 import { MiniChart } from '@/components/MiniChart';
+import { AssetPickerSheet } from '@/components/AssetPickerSheet';
 import { formatPrice, formatChange } from '@/utils/formatters';
 import { useApp } from '@/context/AppContext';
 import { usePortfolio, PortfolioPosition } from '@/context/PortfolioContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
@@ -22,7 +23,8 @@ export default function PortfolioScreen() {
   const { subscription, upgradeToPro } = useApp();
   const { positions, addPosition, removePosition } = usePortfolio();
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [quantity, setQuantity] = useState('');
   const [buyPrice, setBuyPrice] = useState('');
@@ -54,6 +56,14 @@ export default function PortfolioScreen() {
   const topPerformer = [...enriched].sort((a, b) => b.pnlPct - a.pnlPct)[0];
   const worstPerformer = [...enriched].sort((a, b) => a.pnlPct - b.pnlPct)[0];
 
+  function handleAssetSelected(asset: Asset) {
+    setSelectedAsset(asset);
+    setBuyPrice(asset.price.toFixed(asset.price < 1 ? 4 : 2));
+    setQuantity('');
+    setShowPicker(false);
+    setTimeout(() => setShowFormModal(true), 300);
+  }
+
   function handleAdd() {
     if (!selectedAsset || !quantity || !buyPrice) return;
     const qty = parseFloat(quantity);
@@ -68,18 +78,22 @@ export default function PortfolioScreen() {
     });
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowAddModal(false);
+    setShowFormModal(false);
     setSelectedAsset(null);
     setQuantity('');
     setBuyPrice('');
   }
 
-  function openAddModal() {
+  function openAdd() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowAddModal(true);
+    setShowPicker(true);
   }
 
   const isPositivePortfolio = totalPnl >= 0;
+  const pnlColor = isPositivePortfolio ? Colors.bullish : Colors.bearish;
+  const qty = parseFloat(quantity);
+  const bp = parseFloat(buyPrice);
+  const previewValue = !isNaN(qty) && !isNaN(bp) ? qty * bp : null;
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
@@ -88,7 +102,7 @@ export default function PortfolioScreen() {
           <Text style={styles.title}>Portfolio</Text>
           <Text style={styles.subtitle}>{enriched.length} positions</Text>
         </View>
-        <Pressable onPress={openAddModal} style={styles.addBtn} testID="portfolio-add">
+        <Pressable onPress={openAdd} style={styles.addBtn} testID="portfolio-add">
           <Ionicons name="add" size={20} color={Colors.accent} />
         </Pressable>
       </View>
@@ -105,43 +119,36 @@ export default function PortfolioScreen() {
           <>
             {enriched.length > 0 && (
               <View style={styles.summaryCard}>
-                <View style={styles.summaryMain}>
-                  <Text style={styles.summaryLabel}>Total Value</Text>
-                  <Text style={styles.summaryValue}>{formatPrice(totalValue)}</Text>
-                  <View style={[
-                    styles.summaryPill,
-                    { backgroundColor: isPositivePortfolio ? Colors.bullishDim : Colors.bearishDim }
-                  ]}>
+                <View style={styles.summaryTop}>
+                  <View>
+                    <Text style={styles.summaryLabel}>Total Value</Text>
+                    <Text style={styles.summaryValue}>${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  </View>
+                  <View style={[styles.summaryPnlBadge, { backgroundColor: isPositivePortfolio ? Colors.bullishDim : Colors.bearishDim }]}>
                     <Ionicons
-                      name={isPositivePortfolio ? 'arrow-up' : 'arrow-down'}
-                      size={12}
-                      color={isPositivePortfolio ? Colors.bullish : Colors.bearish}
+                      name={isPositivePortfolio ? 'trending-up' : 'trending-down'}
+                      size={14} color={pnlColor}
                     />
-                    <Text style={[
-                      styles.summaryPillText,
-                      { color: isPositivePortfolio ? Colors.bullish : Colors.bearish }
-                    ]}>
-                      {isPositivePortfolio ? '+' : ''}{formatPrice(totalPnl)} ({formatChange(totalPnlPct)})
+                    <Text style={[styles.summaryPnlText, { color: pnlColor }]}>
+                      {isPositivePortfolio ? '+' : ''}{totalPnl >= 0 ? '' : ''}{Math.abs(totalPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}  {isPositivePortfolio ? '+' : ''}{totalPnlPct.toFixed(2)}%
                     </Text>
                   </View>
                 </View>
                 {(topPerformer || worstPerformer) && (
                   <View style={styles.performerRow}>
                     {topPerformer && (
-                      <View style={styles.performerCard}>
-                        <Text style={styles.performerLabel}>Top Gainer</Text>
-                        <Text style={styles.performerSymbol}>{topPerformer.symbol}</Text>
-                        <Text style={[styles.performerChange, { color: Colors.bullish }]}>
-                          {formatChange(topPerformer.pnlPct)}
+                      <View style={styles.performerItem}>
+                        <Text style={styles.performerLabel}>Best</Text>
+                        <Text style={[styles.performerSymbol, { color: Colors.bullish }]}>
+                          {topPerformer.asset.symbol} +{topPerformer.pnlPct.toFixed(1)}%
                         </Text>
                       </View>
                     )}
                     {worstPerformer && worstPerformer.symbol !== topPerformer?.symbol && (
-                      <View style={styles.performerCard}>
-                        <Text style={styles.performerLabel}>Worst Loss</Text>
-                        <Text style={styles.performerSymbol}>{worstPerformer.symbol}</Text>
-                        <Text style={[styles.performerChange, { color: Colors.bearish }]}>
-                          {formatChange(worstPerformer.pnlPct)}
+                      <View style={[styles.performerItem, { alignItems: 'flex-end' }]}>
+                        <Text style={styles.performerLabel}>Worst</Text>
+                        <Text style={[styles.performerSymbol, { color: Colors.bearish }]}>
+                          {worstPerformer.asset.symbol} {worstPerformer.pnlPct.toFixed(1)}%
                         </Text>
                       </View>
                     )}
@@ -149,147 +156,154 @@ export default function PortfolioScreen() {
                 )}
               </View>
             )}
-
-            {enriched.length > 0 && (
-              <Text style={styles.sectionTitle}>Positions</Text>
-            )}
           </>
         )}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
-            <Ionicons name="pie-chart-outline" size={44} color={Colors.textMuted} />
+            <Ionicons name="bar-chart-outline" size={44} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No positions yet</Text>
-            <Text style={styles.emptyText}>Track your investments and monitor P/L</Text>
-            <Pressable onPress={openAddModal} style={styles.emptyAddBtn}>
-              <Text style={styles.emptyAddBtnText}>Add Position</Text>
+            <Text style={styles.emptyText}>Add your first position to start tracking your portfolio</Text>
+            <Pressable onPress={openAdd} style={styles.emptyBtn} testID="portfolio-empty-add">
+              <Text style={styles.emptyBtnText}>Add Position</Text>
             </Pressable>
           </View>
         )}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         renderItem={({ item }) => {
-          const isPos = item.pnl >= 0;
-          const pnlColor = isPos ? Colors.bullish : Colors.bearish;
+          const pnlC = item.pnl >= 0 ? Colors.bullish : Colors.bearish;
           return (
             <Pressable
               onPress={() => router.push(`/chart/${item.symbol}`)}
-              style={({ pressed }) => [styles.posCard, pressed && styles.posCardPressed]}
+              style={({ pressed }) => [styles.positionCard, pressed && { opacity: 0.85 }]}
             >
-              <View style={styles.posLeft}>
-                <View style={styles.posSymbolRow}>
-                  <View style={styles.symbolBadge}>
-                    <Text style={styles.symbolText}>{item.symbol}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.posName}>{item.asset.name}</Text>
-                    <Text style={styles.posQty}>
-                      {item.quantity} {item.asset.category === 'crypto' ? 'units' : 'shares'} · avg {formatPrice(item.buyPrice, item.asset.currency)}
-                    </Text>
-                  </View>
+              <View style={styles.positionTop}>
+                <View style={styles.positionLeft}>
+                  <Text style={styles.posSymbol}>{item.symbol}</Text>
+                  <Text style={styles.posName}>{item.asset.name}</Text>
+                </View>
+                <MiniChart symbol={item.symbol} positive={item.pnl >= 0} />
+              </View>
+              <View style={styles.positionStats}>
+                <View style={styles.posStat}>
+                  <Text style={styles.posStatLabel}>Qty</Text>
+                  <Text style={styles.posStatValue}>{item.quantity}</Text>
+                </View>
+                <View style={styles.posStat}>
+                  <Text style={styles.posStatLabel}>Avg</Text>
+                  <Text style={styles.posStatValue}>{formatPrice(item.buyPrice, item.asset.currency)}</Text>
+                </View>
+                <View style={styles.posStat}>
+                  <Text style={styles.posStatLabel}>Current</Text>
+                  <Text style={styles.posStatValue}>{formatPrice(item.asset.price, item.asset.currency)}</Text>
+                </View>
+                <View style={styles.posStat}>
+                  <Text style={styles.posStatLabel}>P&L</Text>
+                  <Text style={[styles.posStatValue, { color: pnlC }]}>
+                    {item.pnl >= 0 ? '+' : ''}{item.pnlPct.toFixed(2)}%
+                  </Text>
                 </View>
               </View>
-              <View style={styles.posRight}>
-                <MiniChart
-                  symbol={item.symbol}
-                  currentPrice={item.asset.price}
-                  changePercent={item.asset.changePercent24h}
-                  width={64}
-                  height={28}
-                />
-                <Text style={styles.posValue}>{formatPrice(item.currentValue)}</Text>
-                <Text style={[styles.posChange, { color: pnlColor }]}>
-                  {isPos ? '+' : ''}{formatPrice(item.pnl)} ({formatChange(item.pnlPct)})
-                </Text>
-              </View>
               <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  removePosition(item.symbol);
-                }}
-                style={styles.removeBtn}
-                testID={`remove-${item.symbol}`}
+                onPress={(e) => { e.stopPropagation(); removePosition(item.symbol); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                style={styles.removeBtn} hitSlop={8}
               >
-                <Ionicons name="trash-outline" size={14} color={Colors.textMuted} />
+                <Ionicons name="trash-outline" size={15} color={Colors.textMuted} />
               </Pressable>
             </Pressable>
           );
         }}
       />
 
-      <Modal visible={showAddModal} transparent animationType="slide" onRequestClose={() => setShowAddModal(false)}>
+      <AssetPickerSheet
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={handleAssetSelected}
+        title="Add Position"
+      />
+
+      <Modal
+        visible={showFormModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFormModal(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.formSheet, { paddingBottom: (Platform.OS === 'web' ? 34 : insets.bottom) + 8 }]}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedAsset ? `Add ${selectedAsset.symbol}` : 'Select Asset'}
-              </Text>
-              <Pressable onPress={() => { setShowAddModal(false); setSelectedAsset(null); setQuantity(''); setBuyPrice(''); }}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.formAssetInfo}>
+                <Text style={styles.formAssetSymbol}>{selectedAsset?.symbol}</Text>
+                <Text style={styles.formAssetName}>{selectedAsset?.name}</Text>
+              </View>
+              <Pressable onPress={() => setShowFormModal(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            {!selectedAsset ? (
-              <FlatList
-                data={MOCK_ASSETS}
-                keyExtractor={a => a.symbol}
-                contentContainerStyle={styles.modalList}
-                ItemSeparatorComponent={() => <View style={styles.modalDivider} />}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => { setSelectedAsset(item); setBuyPrice(item.price.toString()); }}
-                    style={({ pressed }) => [styles.assetRow, pressed && { opacity: 0.7 }]}
-                  >
-                    <View>
-                      <Text style={styles.assetSymbol}>{item.symbol}</Text>
-                      <Text style={styles.assetNameSmall}>{item.name}</Text>
-                    </View>
-                    <Text style={styles.assetPrice}>{formatPrice(item.price, item.currency)}</Text>
-                  </Pressable>
-                )}
-              />
-            ) : (
-              <View style={styles.addForm}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Quantity</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={quantity}
-                    onChangeText={setQuantity}
-                    placeholder="e.g. 10"
-                    placeholderTextColor={Colors.textMuted}
-                    keyboardType="decimal-pad"
-                    autoFocus
-                  />
-                </View>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Buy Price ({selectedAsset.currency || '$'})</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={buyPrice}
-                    onChangeText={setBuyPrice}
-                    placeholder={`e.g. ${selectedAsset.price}`}
-                    placeholderTextColor={Colors.textMuted}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                {quantity && buyPrice && (
-                  <View style={styles.calcPreview}>
-                    <Text style={styles.calcLabel}>Total position value:</Text>
-                    <Text style={styles.calcValue}>
-                      {formatPrice(parseFloat(quantity || '0') * parseFloat(buyPrice || '0'))}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.formBtns}>
-                  <Pressable onPress={() => setSelectedAsset(null)} style={styles.backFormBtn}>
-                    <Text style={styles.backFormBtnText}>Back</Text>
-                  </Pressable>
-                  <Pressable onPress={handleAdd} style={styles.confirmBtn} testID="portfolio-confirm-add">
-                    <Text style={styles.confirmBtnText}>Add Position</Text>
-                  </Pressable>
-                </View>
+            <KeyboardAwareScrollView
+              keyboardShouldPersistTaps="handled"
+              bottomOffset={24}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.formScrollContent}
+            >
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Quantity</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={Colors.textMuted}
+                  returnKeyType="next"
+                  testID="portfolio-qty"
+                />
               </View>
-            )}
+
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Buy Price ({selectedAsset?.currency})</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={buyPrice}
+                  onChangeText={setBuyPrice}
+                  keyboardType="numeric"
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.textMuted}
+                  returnKeyType="done"
+                  onSubmitEditing={handleAdd}
+                  testID="portfolio-price"
+                />
+              </View>
+
+              {previewValue !== null && (
+                <View style={styles.calcPreview}>
+                  <Text style={styles.calcLabel}>Position Value</Text>
+                  <Text style={styles.calcValue}>
+                    {selectedAsset?.currency}{previewValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.formBtns}>
+                <Pressable
+                  onPress={() => setShowFormModal(false)}
+                  style={({ pressed }) => [styles.backFormBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.backFormBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleAdd}
+                  style={({ pressed }) => [
+                    styles.confirmBtn,
+                    (!quantity || !buyPrice) && styles.confirmBtnDisabled,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  testID="portfolio-confirm"
+                >
+                  <Text style={styles.confirmBtnText}>Add Position</Text>
+                </Pressable>
+              </View>
+            </KeyboardAwareScrollView>
           </View>
         </View>
       </Modal>
@@ -301,112 +315,77 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  title: { fontSize: 22, fontFamily: 'Inter_700Bold', color: Colors.textPrimary, letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textMuted, marginTop: 2 },
+  title: { fontSize: 26, fontFamily: 'Inter_700Bold', color: Colors.textPrimary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textMuted, marginTop: 2 },
   addBtn: {
-    width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.accentDim, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.accentDimBorder,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.accentDim, borderWidth: 1, borderColor: Colors.accentDimBorder,
+    alignItems: 'center', justifyContent: 'center',
   },
   list: { paddingHorizontal: 16, paddingTop: 4 },
   summaryCard: {
-    backgroundColor: Colors.card, borderRadius: 16,
-    borderWidth: 1, borderColor: Colors.cardBorder,
-    padding: 18, marginBottom: 20, gap: 16,
+    backgroundColor: Colors.card, borderRadius: 16, borderWidth: 1,
+    borderColor: Colors.cardBorder, padding: 16, marginBottom: 16, gap: 12,
   },
-  summaryMain: { gap: 6 },
-  summaryLabel: {
-    fontSize: 11, fontFamily: 'Inter_400Regular',
-    color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8,
+  summaryTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  summaryLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  summaryValue: { fontSize: 26, fontFamily: 'Inter_700Bold', color: Colors.textPrimary, letterSpacing: -0.5, marginTop: 2 },
+  summaryPnlBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
   },
-  summaryValue: {
-    fontSize: 34, fontFamily: 'Inter_700Bold',
-    color: Colors.textPrimary, letterSpacing: -1,
-  },
-  summaryPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    alignSelf: 'flex-start', paddingHorizontal: 10,
-    paddingVertical: 5, borderRadius: 20,
-  },
-  summaryPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  performerRow: { flexDirection: 'row', gap: 10 },
-  performerCard: {
-    flex: 1, backgroundColor: Colors.backgroundSecondary,
-    borderRadius: 10, padding: 12,
-  },
-  performerLabel: {
-    fontSize: 10, fontFamily: 'Inter_400Regular',
-    color: Colors.textMuted, marginBottom: 4,
-  },
-  performerSymbol: {
-    fontSize: 14, fontFamily: 'Inter_700Bold', color: Colors.textPrimary,
-  },
-  performerChange: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: {
-    fontSize: 13, fontFamily: 'Inter_600SemiBold',
-    color: Colors.textMuted, marginBottom: 10,
-    textTransform: 'uppercase', letterSpacing: 0.8,
-  },
-  posCard: {
-    backgroundColor: Colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: Colors.cardBorder,
-    padding: 14, flexDirection: 'row',
-    alignItems: 'center', gap: 12,
-  },
-  posCardPressed: { opacity: 0.8 },
-  posLeft: { flex: 1 },
-  posSymbolRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  symbolBadge: {
-    backgroundColor: Colors.accentDim, borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderWidth: 1, borderColor: Colors.accentDimBorder,
-  },
-  symbolText: {
-    fontSize: 12, fontFamily: 'Inter_700Bold', color: Colors.accent,
-  },
-  posName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: Colors.textPrimary },
-  posQty: { fontSize: 11, fontFamily: 'Inter_400Regular', color: Colors.textMuted, marginTop: 2 },
-  posRight: { alignItems: 'flex-end', gap: 2 },
-  posValue: { fontSize: 14, fontFamily: 'Inter_700Bold', color: Colors.textPrimary },
-  posChange: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-  removeBtn: { padding: 6 },
+  summaryPnlText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  performerRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  performerItem: { gap: 2 },
+  performerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  performerSymbol: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   emptyState: { alignItems: 'center', paddingVertical: 80, gap: 10 },
   emptyTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
   emptyText: {
-    fontSize: 13, fontFamily: 'Inter_400Regular',
-    color: Colors.textMuted, textAlign: 'center', paddingHorizontal: 40,
+    fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textMuted,
+    textAlign: 'center', paddingHorizontal: 40,
   },
-  emptyAddBtn: {
+  emptyBtn: {
     marginTop: 8, backgroundColor: Colors.accent,
     paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10,
   },
-  emptyAddBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: Colors.white },
+  emptyBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: Colors.white },
+  positionCard: {
+    backgroundColor: Colors.card, borderRadius: 14, borderWidth: 1,
+    borderColor: Colors.cardBorder, padding: 14,
+  },
+  positionTop: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    justifyContent: 'space-between', marginBottom: 12,
+  },
+  positionLeft: { gap: 2 },
+  posSymbol: { fontSize: 16, fontFamily: 'Inter_700Bold', color: Colors.textPrimary },
+  posName: { fontSize: 11, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  positionStats: { flexDirection: 'row', justifyContent: 'space-between' },
+  posStat: { alignItems: 'center', gap: 3 },
+  posStatLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 },
+  posStatValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: Colors.textPrimary },
+  removeBtn: { position: 'absolute', top: 12, right: 12 },
   modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: 20,
-    borderTopRightRadius: 20, paddingTop: 12, maxHeight: '75%',
+  formSheet: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 12,
+    maxHeight: '75%',
   },
   modalHandle: {
     width: 36, height: 4, backgroundColor: Colors.cardBorder,
-    borderRadius: 2, alignSelf: 'center', marginBottom: 16,
+    borderRadius: 2, alignSelf: 'center', marginBottom: 14,
   },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12,
-  },
-  modalTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.textPrimary },
-  modalList: { paddingHorizontal: 16, paddingBottom: 16 },
-  modalDivider: { height: 1, backgroundColor: Colors.separator, marginVertical: 2 },
-  assetRow: {
+  modalHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 12, paddingHorizontal: 4,
+    paddingHorizontal: 20, marginBottom: 4,
   },
-  assetSymbol: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: Colors.textPrimary },
-  assetNameSmall: { fontSize: 11, fontFamily: 'Inter_400Regular', color: Colors.textMuted, marginTop: 1 },
-  assetPrice: { fontSize: 13, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
-  addForm: { paddingHorizontal: 20, paddingTop: 8, gap: 16 },
+  formAssetInfo: { gap: 1 },
+  formAssetSymbol: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.textPrimary },
+  formAssetName: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textMuted },
+  formScrollContent: { paddingHorizontal: 20, paddingTop: 12, gap: 16, paddingBottom: 8 },
   formField: { gap: 6 },
   formLabel: {
     fontSize: 12, fontFamily: 'Inter_500Medium',
@@ -415,8 +394,8 @@ const styles = StyleSheet.create({
   formInput: {
     backgroundColor: Colors.backgroundTertiary, borderRadius: 10,
     borderWidth: 1, borderColor: Colors.cardBorder,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.textPrimary,
+    paddingHorizontal: 14, paddingVertical: 14,
+    fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textPrimary,
   },
   calcPreview: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -427,14 +406,15 @@ const styles = StyleSheet.create({
   calcValue: { fontSize: 15, fontFamily: 'Inter_700Bold', color: Colors.accent },
   formBtns: { flexDirection: 'row', gap: 10, paddingBottom: 8 },
   backFormBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 12,
-    alignItems: 'center', backgroundColor: Colors.backgroundTertiary,
+    flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center',
+    backgroundColor: Colors.backgroundTertiary,
     borderWidth: 1, borderColor: Colors.cardBorder,
   },
   backFormBtnText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
   confirmBtn: {
-    flex: 2, paddingVertical: 14, borderRadius: 12,
-    alignItems: 'center', backgroundColor: Colors.accent,
+    flex: 2, paddingVertical: 14, borderRadius: 12, alignItems: 'center',
+    backgroundColor: Colors.accent,
   },
+  confirmBtnDisabled: { backgroundColor: Colors.backgroundTertiary },
   confirmBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: Colors.white },
 });
